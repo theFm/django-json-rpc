@@ -12,11 +12,11 @@ class ServiceProxy(object):
     if self.__service_name != None:
       name = "%s.%s" % (self.__service_name, name)
     return ServiceProxy(self.__service_url, name, self.__version)
-  
+
   def __repr__(self):
     return {"jsonrpc": self.__version,
             "method": self.__service_name}
-  
+
   def __call__(self, *args, **kwargs):
     params = kwargs if len(kwargs) else args
     if Any.kind(params) == Object and self.__version != '2.0':
@@ -31,7 +31,7 @@ class ServiceProxy(object):
                           'params': params,
                           'id': str(uuid.uuid1())})).read()
     y = loads(r)
-    if u'error' in y:
+    if y.get("error", None):
       try:
         from django.conf import settings
         if settings.DEBUG:
