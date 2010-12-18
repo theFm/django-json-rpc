@@ -190,8 +190,8 @@ class ServiceProxyText(unittest.TestCase):
     try:
       proxy.jsonrpc.test(string='Hello')
     except Exception, e:
-      self.assert_(e.args[0] == 'Unsupport arg type for JSON-RPC 1.0 '
-                                '(the default version for this client, '
+      self.assert_(e.args[0] == 'Unsupported arg type for JSON-RPC 1.0 ' \
+                                '(the default version for this client, ' \
                                 'pass version="2.0" to use keyword arguments)')
     else:
       self.assert_(False, 'Proxy didnt warn about version mismatch')
