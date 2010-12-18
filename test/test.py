@@ -362,6 +362,19 @@ class JSONRPCTest(unittest.TestCase):
     else:
       self.assert_(False, 'Didnt return status code 401 on unauthorized access')
 
+  def test_regr_bug_23(self):
+    # system.describe was throwing the following error because return
+    # types of methods weren't explicitly converted to strings:
+    #
+    #     <class 'jsonrpc.types.Any'> is not JSON serializable
+    response = self.proxy10.system.describe()
+    self.assertEqual(response["error"], None)
+    self.assertEqual("procs" in response["result"], True)
+    self.assertEqual(len(response["result"]["procs"]), 12)
+    response = self.proxy20.system.describe()
+    self.assertEqual(response["error"], None)
+    self.assertEqual("procs" in response["result"], True)
+    self.assertEqual(len(response["result"]["procs"]), 12)
 
 
 def proc_cleanup():
