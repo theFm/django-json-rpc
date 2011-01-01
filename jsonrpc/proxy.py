@@ -4,12 +4,18 @@ from jsonrpc._json import loads, dumps
 from jsonrpc.types import Any, Object
 
 
+class JsonRpcTestClient(Client):
+    def store_exc_info(self, **kwargs):
+        # Do not store view exceptions. Let the site object handle them.
+        pass
+
+
 class TestServiceProxy(object):
     def __init__(self, service_url, service_name=None, version='1.0'):
         self.__version = str(version)
         self.__service_url = service_url
         self.__service_name = service_name
-        self.client = Client()
+        self.client = JsonRpcTestClient()
 
     def __getattr__(self, name):
         if self.__service_name != None:

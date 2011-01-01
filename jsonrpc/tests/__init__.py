@@ -1,8 +1,11 @@
 import unittest
+import urllib
 from django.test import TestCase
+from django.utils import simplejson as json
+from django.contrib.auth.models import User
 from jsonrpc import jsonrpc_method, _parse_sig, Any, SortedDict
-from jsonrpc.exceptions import InvalidParamsError
-from jsonrpc.proxy import TestServiceProxy
+from jsonrpc.exceptions import InvalidParamsError, InvalidCredentialsError
+from jsonrpc.proxy import TestServiceProxy, JsonRpcTestClient
 from jsonrpc.site import validate_params
 from jsonrpc.types import String, Object, Array, Nil
 
@@ -72,3 +75,165 @@ class JSONRPCFunctionalTests(unittest.TestCase):
         assert Any.decode('str') == String
         assert Any.kind({}) == Object
         assert Any.kind(None) == Nil
+
+
+class JSONRPCTest(TestCase):
+    def setUp(self):
+        if not User.objects.filter(username="sammeh").exists():
+            User.objects.create_user(username='sammeh', email='sam@rf.com', password='password').save()
+        self.host = "/json/"
+        self.proxy10 = TestServiceProxy(self.host, version='1.0')
+        self.proxy20 = TestServiceProxy(self.host, version='2.0')
+        self.client = JsonRpcTestClient()
+
+    def call(self, request_dict):
+        response = self.client.post(self.host, json.dumps(request_dict),
+                                                content_type="application/json-rpc")
+        return json.loads(response.content)
+
+    def test_10(self):
+        self.assertEqual(
+            self.proxy10.jsonrpc.test('this is a string')[u'result'], u'this is a string')
+
+    def test_11(self):
+        req = {
+            u'version': u'1.1',
+            u'method': u'jsonrpc.test',
+            u'params': [u'this is a string'],
+            u'id': u'holy-mother-of-god'
+        }
+        resp = self.call(req)
+        self.assertEquals(resp[u'id'], req[u'id'])
+        self.assertEquals(resp[u'result'], req[u'params'][0])
+
+    def test_10_notify(self):
+        pass
+
+    def test_11_positional_mixed_args(self):
+        req = {
+            u'version': u'1.1',
+            u'method': u'jsonrpc.strangeEcho',
+            u'params': {u'1': u'this is a string', u'2': u'this is omg',
+                        u'wtf': u'pants', u'nowai': 'nopants'},
+            u'id': u'toostrange'
+        }
+        resp = self.call(req)
+        self.assertEquals(resp[u'result'][-1], u'Default')
+        self.assertEquals(resp[u'result'][1], u'this is omg')
+        self.assertEquals(resp[u'result'][0], u'this is a string')
+        self.assert_(u'error' not in resp)
+
+    def test_11_GET(self):
+        pass
+
+    def test_11_GET_unsafe(self):
+        pass
+
+    def test_11_GET_mixed_args(self):
+        params = {u'1': u'this is a string', u'2': u'this is omg',
+                  u'wtf': u'pants', u'nowai': 'nopants'}
+        url = "%s%s?%s" % (
+            self.host, 'jsonrpc.strangeSafeEcho',
+            (''.join(['%s=%s&' % (k, urllib.quote(v)) for k, v in params.iteritems()])).rstrip('&')
+        )
+        resp = json.loads(self.client.get(url).content)
+        self.assertEquals(resp[u'result'][-1], u'Default')
+        self.assertEquals(resp[u'result'][1], u'this is omg')
+        self.assertEquals(resp[u'result'][0], u'this is a string')
+        self.assert_(u'error' not in resp)
+
+    def test_20_checked(self):
+        self.assertEqual(
+            self.proxy10.jsonrpc.varArgs('o', 'm', 'g')[u'result'],
+            ['o', 'm', 'g']
+        )
+        self.assert_(self.proxy10.jsonrpc.varArgs(1,2,3)[u'error'])
+
+    def test_11_service_description(self):
+        pass
+
+    def test_20_keyword_args(self):
+        self.assertEqual(
+            self.proxy20.jsonrpc.test(string='this is a string')[u'result'],
+            u'this is a string')
+
+    def test_20_positional_args(self):
+        self.assertEqual(
+            self.proxy20.jsonrpc.test('this is a string')[u'result'],
+            u'this is a string')
+
+    def test_20_notify(self):
+        req = {
+            u'jsonrpc': u'2.0',
+            u'method': u'jsonrpc.notify',
+            u'params': [u'this is a string'],
+            u'id': None
+        }
+        resp = self.client.post(self.host, json.dumps(req),
+                                content_type="application/json-rpc").content
+        self.assertEquals(resp, '')
+
+    def test_20_batch(self):
+        req = [{
+            u'jsonrpc': u'2.0',
+            u'method': u'jsonrpc.test',
+            u'params': [u'this is a string'],
+            u'id': u'id-'+unicode(i)
+        } for i in range(5)]
+        resp = self.call(req)
+        self.assertEquals(len(resp), len(req))
+        for i, D in enumerate(resp):
+            self.assertEquals(D[u'result'], req[i][u'params'][0])
+            self.assertEquals(D[u'id'], req[i][u'id'])
+
+    def test_20_batch_with_errors(self):
+        req = [{
+            u'jsonrpc': u'2.0',
+            u'method': u'jsonrpc.test' if not i % 2 else u'jsonrpc.fails',
+            u'params': [u'this is a string'],
+            u'id': u'id-'+unicode(i)
+        } for i in range(10)]
+        resp = self.call(req)
+        self.assertEquals(len(resp), len(req))
+        for i, D in enumerate(resp):
+            if not i % 2:
+                self.assertEquals(D[u'result'], req[i][u'params'][0])
+                self.assertEquals(D[u'id'], req[i][u'id'])
+            else:
+                self.assertEquals(D[u'result'], None)
+                self.assert_(u'error' in D)
+                self.assertEquals(D[u'error'][u'code'], 500)
+
+    def test_authenticated_ok(self):
+        self.assertEquals(
+            self.proxy10.jsonrpc.testAuth(
+                'sammeh', 'password', u'this is a string')[u'result'],
+            u'this is a string')
+
+    def test_authenticated_ok_kwargs(self):
+        self.assertEquals(
+            self.proxy20.jsonrpc.testAuth(
+                username='sammeh', password='password', string=u'this is a string')[u'result'],
+            u'this is a string')
+
+    def test_authenticated_fail_kwargs(self):
+        response = self.proxy20.jsonrpc.testAuth(username='osammeh', password='password', string=u'this is a string')
+        self.assertEqual(response[u"error"] is not None, True)
+
+    def test_authenticated_fail(self):
+        response = self.proxy20.jsonrpc.testAuth('osammeh', 'password', u'this is a string')
+        self.assertEqual(response[u"error"] is not None, True)
+
+    def test_regr_bug_23(self):
+        # system.describe was throwing the following error because return
+        # types of methods weren't explicitly converted to strings:
+        #
+        #     <class 'jsonrpc.types.Any'> is not JSON serializable
+        response = self.proxy10.system.describe()
+        self.assertEqual(response["error"], None)
+        self.assertEqual("procs" in response["result"], True)
+        self.assertEqual(len(response["result"]["procs"]), 12)
+        response = self.proxy20.system.describe()
+        self.assertEqual(response["error"], None)
+        self.assertEqual("procs" in response["result"], True)
+        self.assertEqual(len(response["result"]["procs"]), 12)
