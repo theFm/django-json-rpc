@@ -203,7 +203,7 @@ class JSONRPCSite(object):
                 valid, D = self.validate_get(request, method)
                 if not valid:
                     raise InvalidRequestError('The method you are trying to access is '
-                                              'not availble by GET requests')
+                                              'not available by GET requests')
             elif not request.method.lower() == 'post':
                 raise RequestPostError
             else:
@@ -236,7 +236,10 @@ class JSONRPCSite(object):
 
             json_rpc = dumps(response, cls=json_encoder)
 
-        return HttpResponse(json_rpc, status=status, content_type='application/json-rpc')
+        response = HttpResponse(json_rpc, status=status, content_type='application/json-rpc')
+        response['Access-Control-Allow-Origin'] = '*'
+        response['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response
 
     def procedure_desc(self, key):
         M = self.urls[key]

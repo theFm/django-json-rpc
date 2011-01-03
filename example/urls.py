@@ -3,6 +3,9 @@ from django.conf import settings
 from jsonrpc import jsonrpc_site
 
 
+import jsonrpc.tests.methods
+
+
 urlpatterns = patterns('',
     (r'^json/(?P<method>[a-zA-Z0-9.]+)$', jsonrpc_site.dispatch),
     (r'^json/', jsonrpc_site.dispatch, {}, "jsonrpc_mountpoint"),
