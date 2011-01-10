@@ -84,16 +84,16 @@ def validate_params(method, D):
 
 class JSONRPCSite(object):
     "A JSON-RPC Site"
-    def __init__(self, json_encoder=DjangoJSONEncoder):
-        self.urls = {}
+    def __init__(self, name, version="1.0", json_encoder=DjangoJSONEncoder):
+        self._urls = {}
         self.uuid = str(uuid1())
-        self.version = '1.0'
-        self.name = 'django-json-rpc'
-        self.register('system.describe', self.describe)
+        self.version = version
+        self.name = name
+        self.register("system.describe", self.describe)
         self.json_encoder = json_encoder
 
     def register(self, name, method):
-        self.urls[unicode(name)] = method
+        self._urls[unicode(name)] = method
 
     def empty_response(self, version='1.0'):
         resp = {'id': None}
@@ -110,7 +110,7 @@ class JSONRPCSite(object):
                                             for k, v in r])
         if request.method == 'GET':
             method = unicode(method)
-            if method in self.urls and getattr(self.urls[method], 'json_safe', False):
+            if method in self._urls and getattr(self._urls[method], 'json_safe', False):
                 D = {
                   'params': encode_get_params(request.GET.lists()),
                   'method': method,
@@ -131,9 +131,9 @@ class JSONRPCSite(object):
         try:
             if 'method' not in D or 'params' not in D:
                 raise InvalidParamsError('Request requires str:"method" and list:"params"')
-            if D['method'] not in self.urls:
+            if D['method'] not in self._urls:
                 raise MethodNotFoundError('Method not found. Available methods: %s' % (
-                              '\n'.join(self.urls.keys())))
+                              '\n'.join(self._urls.keys())))
 
             if 'jsonrpc' in D:
                 if str(D['jsonrpc']) not in apply_version:
@@ -146,7 +146,7 @@ class JSONRPCSite(object):
             else:
                 request.jsonrpc_version = '1.0'
 
-            method = self.urls[str(D['method'])]
+            method = self._urls[str(D['method'])]
             if getattr(method, 'json_validate', False):
                 validate_params(method, D)
             R = apply_version[version](method, request, D['params'])
@@ -239,7 +239,7 @@ class JSONRPCSite(object):
         return response
 
     def procedure_desc(self, key):
-        M = self.urls[key]
+        M = self._urls[key]
         return {
             'name': M.json_method,
             'summary': M.__doc__,
@@ -256,11 +256,11 @@ class JSONRPCSite(object):
             'summary': self.__doc__,
             'version': self.version,
             'procs': [self.procedure_desc(k)
-                for k in self.urls.iterkeys()
-                    if self.urls[k] != self.describe]}
+                for k in self._urls.iterkeys()
+                    if self._urls[k] != self.describe]}
 
     def describe(self, request):
         return self.service_desc()
 
 
-jsonrpc_site = JSONRPCSite()
+jsonrpc_site = JSONRPCSite("django-json-rpc")
