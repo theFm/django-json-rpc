@@ -90,9 +90,6 @@ class JSONRPCSite(object):
         self.version = '1.0'
         self.name = 'django-json-rpc'
         self.register('system.describe', self.describe)
-        self.set_json_encoder(json_encoder)
-
-    def set_json_encoder(self, json_encoder=DjangoJSONEncoder):
         self.json_encoder = json_encoder
 
     def register(self, name, method):
