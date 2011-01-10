@@ -27,13 +27,6 @@ def _type_checking_available(sig='', validate=False):
           'or later or disable type checking in %s' % sig)
 
 
-def _validate_arg(value, expected):
-    "Returns whether or not ``value`` is the ``expected`` type."
-    if type(value) == expected:
-        return True
-    return False
-
-
 def _eval_arg_type(arg_type, T=Any, arg=None, sig=None):
     """
     Returns a type from a snippit of python source. Should normally be
