@@ -3,48 +3,40 @@ import urllib
 from django.test import TestCase
 from django.utils import simplejson as json
 from django.contrib.auth.models import User
-from jsonrpc import jsonrpc_method, _parse_sig, Any, SortedDict
+from jsonrpc import jsonrpc_method, Any, SortedDict
 from jsonrpc.exceptions import InvalidParamsError, InvalidCredentialsError
 from jsonrpc.proxy import TestServiceProxy, JsonRpcTestClient
+from jsonrpc import RpcMethod
 from jsonrpc.site import validate_params
-from jsonrpc.types import String, Object, Array, Nil
+from jsonrpc.types import String, Object, Array, Nil, Number
 
 
 # Register JSON-RPC methods
 import jsonrpc.tests.methods
 
 
-class JSONRPCFunctionalTests(unittest.TestCase):
-    def test_method_parser(self):
-        working_sigs = [
-            ('jsonrpc', 'jsonrpc', SortedDict(), Any),
-            ('jsonrpc.methodName', 'jsonrpc.methodName', SortedDict(), Any),
-            ('jsonrpc.methodName() -> list', 'jsonrpc.methodName', SortedDict(), list),
-            ('jsonrpc.methodName(str, str, str ) ', 'jsonrpc.methodName', SortedDict([('a', str), ('b', str), ('c', str)]), Any),
-            ('jsonrpc.methodName(str, b=str, c=str)', 'jsonrpc.methodName', SortedDict([('a', str), ('b', str), ('c', str)]), Any),
-            ('jsonrpc.methodName(str, b=str) -> dict', 'jsonrpc.methodName', SortedDict([('a', str), ('b', str)]), dict),
-            ('jsonrpc.methodName(str, str, c=Any) -> Any', 'jsonrpc.methodName', SortedDict([('a', str), ('b', str), ('c', Any)]), Any),
-            ('jsonrpc(Any ) ->  Any', 'jsonrpc', SortedDict([('a', Any)]), Any),
-        ]
-        error_sigs = [
-            ('jsonrpc(str) -> nowai', ValueError),
-            ('jsonrpc(nowai) -> Any', ValueError),
-            ('jsonrpc(nowai=str, str)', ValueError),
-            ('jsonrpc.methodName(nowai*str) -> Any', ValueError)
-        ]
-        for sig in working_sigs:
-            ret = _parse_sig(sig[0], list(iter(sig[2])))
-            self.assertEquals(ret[0], sig[1])
-            self.assertEquals(ret[1], sig[2])
-            self.assertEquals(ret[2], sig[3])
-        for sig in error_sigs:
-            e = None
-            try:
-                _parse_sig(sig[0], ['a'])
-            except Exception, exc:
-                e = exc
-            self.assert_(type(e) is sig[1])
+class RpcMethodClassTestCase(unittest.TestCase):
+    def setUp(self):
+        def no_arg_method():
+            return None
+        def add_method(request, param1, param2):
+            return param1 + param2
+        self.no_arg_method = no_arg_method
+        self.add_method = add_method
 
+    def test_rpc_method_signature_extraction(self):
+        rpc_method = RpcMethod(self.add_method)
+        self.assertEqual(RpcMethod.parse_signature(self.no_arg_method, ""), {"method_name": "no_arg_method", "arguments": SortedDict(), "return_type": Any})
+        self.assertEqual(RpcMethod.parse_signature(self.no_arg_method, "rpc_method"), {"method_name": "rpc_method", "arguments": SortedDict(), "return_type": Any})
+        self.assertEqual(RpcMethod.parse_signature(self.no_arg_method, "namespace.rpc_method"), {"method_name": "namespace.rpc_method", "arguments": SortedDict(), "return_type": Any})
+        self.assertEqual(RpcMethod.parse_signature(self.no_arg_method, "namespace.rpc_method() -> Number"), {"method_name": "namespace.rpc_method", "arguments": SortedDict(), "return_type": Number})
+        self.assertEqual(RpcMethod.parse_signature(self.add_method, "namespace.rpc_method(Number, Number) -> Number"), {"method_name": "namespace.rpc_method", "arguments": SortedDict([("param1", Number), ("param2", Number)]), "return_type": Number})
+        self.assertEqual(RpcMethod.parse_signature(self.add_method, "namespace.rpc_method(String, String) -> String"), {"method_name": "namespace.rpc_method", "arguments": SortedDict([("param1", String), ("param2", String)]), "return_type": String})
+        self.assertEqual(RpcMethod.parse_signature(self.add_method, "namespace.rpc_method(param1=String, param2=String) -> String"), {"method_name": "namespace.rpc_method", "arguments": SortedDict([("param1", String), ("param2", String)]), "return_type": String})
+        self.assertEqual(RpcMethod.parse_signature(self.add_method, "namespace.rpc_method(String, param2=String) -> String"), {"method_name": "namespace.rpc_method", "arguments": SortedDict([("param1", String), ("param2", String)]), "return_type": String})
+
+
+class JsonRpcFunctionalTestCase(unittest.TestCase):
     def test_validate_args(self):
         sig = 'jsonrpc(String, String) -> String'
         M = jsonrpc_method(sig, validate=True)(lambda r, s1, s2: s1+s2)
@@ -77,7 +69,7 @@ class JSONRPCFunctionalTests(unittest.TestCase):
         assert Any.kind(None) == Nil
 
 
-class JSONRPCTest(TestCase):
+class JsonRpcProtocolTestCase(TestCase):
     def setUp(self):
         if not User.objects.filter(username="sammeh").exists():
             User.objects.create_user(username='sammeh', email='sam@rf.com', password='password').save()

@@ -8,7 +8,12 @@ from jsonrpc.exceptions import *
 
 
 default_site = jsonrpc_site
-KWARG_RE = re.compile(
+KWARG_RE = re.compile(r'(?P<argument_name>[a-zA-Z0-9_]+)\s*' \
+                      r'=\s*(?P<argument_type>[a-zA-Z]+)')
+SIGNATURE_RE = re.compile(r"(?P<method_name>[a-zA-Z0-9._]*)\s*" \
+                          r"(\((?P<argument_signature>[^)].*)?\)\s*" \
+                          r"(\->\s*(?P<return_type>.*))?)?")
+KWARG_RE_OLD = re.compile(
   r'\s*(?P<arg_name>[a-zA-Z0-9_]+)\s*=\s*(?P<arg_type>[a-zA-Z]+)\s*$')
 SIG_RE = re.compile(
   r'\s*(?P<method_name>[a-zA-Z0-9._]+)\s*(\((?P<args_sig>[^)].*)?\)' \
@@ -17,6 +22,65 @@ SIG_RE = re.compile(
 
 class JSONRPCTypeCheckingUnavailable(Exception):
     pass
+
+
+class RpcMethod(object):
+    def __init__(self, func, signature=""):
+        self.func = func
+        self.__doc__ = func.__doc__
+        self.__signature_data = self.parse_signature(func, signature)
+        self.__name__ = self.__signature_data["method_name"]
+
+    @classmethod
+    def parse_signature(cls, func, signature):
+        argument_names = getargspec(func)[0][1:]
+        arguments = SortedDict([(argument_name, Any) for argument_name in argument_names])
+        seen_positional_arguments = False
+        m = SIGNATURE_RE.match(signature)
+        if m is None:
+            raise ValueError("Invalid method signature %s" % repr(signature))
+        groups = m.groupdict()
+        if groups["argument_signature"] and groups["argument_signature"].strip():
+            for idx, argument in enumerate(groups["argument_signature"].strip().split(",")):
+                argument = argument.strip()
+                if "=" in argument:
+                    m = KWARG_RE.match(argument)
+                    if not m:
+                        raise ValueError("Can not parse argument type %s in %s" % (repr(argument), repr(signature)))
+                    argument_name = m.groupdict()["argument_name"].strip()
+                    argument_type = m.groupdict()["argument_type"].strip()
+                    if not (argument_name or argument_type):
+                        raise ValueError("Invalid keyword argument value %s in %s" % (repr(argument), repr(signature)))
+                    arguments[argument_name] = _eval_arg_type(argument_type, None, argument, signature)
+                    seen_positional_arguments = True
+                else:
+                    if seen_positional_arguments:
+                        raise ValueError("Positional arguments must occur before keyword arguments in %s" % repr(signature))
+                    if len(arguments) <= idx:
+                        arguments[str(idx)] = _eval_arg_type(argument, None, argument, signature)
+                    else:
+                        arguments[arguments.keys()[idx]] = _eval_arg_type(argument, None, argument, signature)
+        return {"method_name": groups["method_name"] or func.__name__,
+                "arguments": arguments,
+                "return_type": groups["return_type"]}
+
+    @property
+    def signature_data(self):
+        return self.__signature_data
+
+    @property
+    def signature(self):
+        signature = self.__signature_data["method_name"]
+        signature += "(%s)" % ", ".join(["%s=%s" % item for item in self.__signature_data["arguments"].items()])
+        if self.__signature_data["return_type"]:
+            signature += " -> %s" % self.__signature_data["return_type"]
+        return signature
+
+    def prepend_argument(self, argument_name, argument_type=Any):
+        self.__signature_data["arguments"].insert(0, argument_name, argument_type)
+
+    def __call__(self, request, *args, **kwargs):
+        return self.func(request, *args, **kwargs)
 
 
 def _type_checking_available(sig='', validate=False):
@@ -49,53 +113,6 @@ def _eval_arg_type(arg_type, T=Any, arg=None, sig=None):
             raise TypeError('%s is not a valid type in %s for %s' %
                             (repr(T), arg, sig))
         return T
-
-
-def _parse_sig(sig, arg_names, validate=False):
-    """
-    Parses signatures into a ``SortedDict`` of paramName => type.
-    Numerically-indexed arguments that do not correspond to an argument
-    name in python (ie: it takes a variable number of arguments) will be
-    keyed as the stringified version of it's index.
-
-      sig         the signature to be parsed
-      arg_names   a list of argument names extracted from python source
-
-    Returns a tuple of (method name, types dict, return type)
-    """
-    d = SIG_RE.match(sig)
-    if not d:
-        raise ValueError('Invalid method signature %s' % sig)
-    d = d.groupdict()
-    ret = [(n, Any) for n in arg_names]
-    if 'args_sig' in d and type(d['args_sig']) is str and d['args_sig'].strip():
-        for i, arg in enumerate(d['args_sig'].strip().split(',')):
-            _type_checking_available(sig, validate)
-            if '=' in arg:
-                if not type(ret) is SortedDict:
-                    ret = SortedDict(ret)
-                dk = KWARG_RE.match(arg)
-                if not dk:
-                    raise ValueError('Could not parse arg type %s in %s' % (arg, sig))
-                dk = dk.groupdict()
-                if not sum([(k in dk and type(dk[k]) is str and bool(dk[k].strip()))
-                            for k in ('arg_name', 'arg_type')]):
-                    raise ValueError('Invalid kwarg value %s in %s' % (arg, sig))
-                ret[dk['arg_name']] = _eval_arg_type(dk['arg_type'], None, arg, sig)
-            else:
-                if type(ret) is SortedDict:
-                    raise ValueError('Positional arguments must occur '
-                                    'before keyword arguments in %s' % sig)
-                if len(ret) < i + 1:
-                    ret.append((str(i), _eval_arg_type(arg, None, arg, sig)))
-                else:
-                    ret[i] = (ret[i][0], _eval_arg_type(arg, None, arg, sig))
-    if not type(ret) is SortedDict:
-        ret = SortedDict(ret)
-    return (d['method_name'],
-            ret,
-            (_eval_arg_type(d['return_sig'], Any, 'return', sig)
-              if d['return_sig'] else Any))
 
 
 def _inject_args(sig, types):
@@ -173,18 +190,16 @@ def jsonrpc_method(name, authenticated=False, safe=False, validate=False,
 
     """
     def decorator(func):
-        arg_names = getargspec(func)[0][1:]
-        X = {'name': name, 'arg_names': arg_names}
+        rpc_method = RpcMethod(func, name)
         if authenticated:
             if authenticated is True:
-                # TODO: this is an assumption
-                X['arg_names'] = ['username', 'password'] + X['arg_names']
-                X['name'] = _inject_args(X['name'], ('String', 'String'))
+                rpc_method.prepend_argument("username", String)
+                rpc_method.prepend_argument("password", String)
                 from django.contrib.auth import authenticate
                 from django.contrib.auth.models import User
             else:
                 authenticate = authenticated
-            @wraps(func)
+            @wraps(rpc_method)
             def _func(request, *args, **kwargs):
                 user = getattr(request, 'user', None)
                 is_authenticated = getattr(user, 'is_authenticated', lambda: False)
@@ -211,18 +226,16 @@ def jsonrpc_method(name, authenticated=False, safe=False, validate=False,
                     if user is None:
                         raise InvalidCredentialsError
                     request.user = user
-                return func(request, *args, **kwargs)
+                return rpc_method(request, *args, **kwargs)
         else:
-            _func = func
-        method, arg_types, return_type = \
-                                _parse_sig(X['name'], X['arg_names'], validate)
-        _func.json_args = X['arg_names']
-        _func.json_arg_types = arg_types
-        _func.json_return_type = return_type
-        _func.json_method = method
+            _func = rpc_method
+        _func.json_args = rpc_method.signature_data["arguments"].keys()
+        _func.json_arg_types = rpc_method.signature_data["arguments"]
+        _func.json_return_type = rpc_method.signature_data["return_type"]
+        _func.json_method = rpc_method.signature_data["method_name"]
         _func.json_safe = safe
-        _func.json_sig = X['name']
+        _func.json_sig = rpc_method.signature
         _func.json_validate = validate
-        site.register(method, _func)
+        site.register(rpc_method.signature_data["method_name"], _func)
         return _func
     return decorator
