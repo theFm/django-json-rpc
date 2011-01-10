@@ -79,7 +79,7 @@ def validate_params(method, D):
             raise InvalidParamsError('Too many params provided for %s' % method.json_sig)
         else:
             if len(D['params']) != len(arg_types):
-                raise InvalidParamsError('Not enouh params provided for %s' % method.json_sig)
+                raise InvalidParamsError('Not enough params provided for %s' % method.json_sig)
 
 
 class JSONRPCSite(object):
