@@ -197,7 +197,7 @@ class JSONRPCSite(object):
             # in case we do something json doesn't like, we always get back valid json-rpc response
             response = self.empty_response()
             if request.method.lower() == 'get':
-                valid, D = self.validate_get(request, method)
+                valid, jsonrpc_request = self.validate_get(request, method)
                 if not valid:
                     raise InvalidRequestError('The method you are trying to access is '
                                               'not available by GET requests')
@@ -205,16 +205,16 @@ class JSONRPCSite(object):
                 raise RequestPostError
             else:
                 try:
-                    D = loads(request.raw_post_data)
+                    jsonrpc_request = loads(request.raw_post_data)
                 except:
                     raise InvalidRequestError
 
-            if type(D) is list:
-                response = [self.response_dict(request, d, is_batch=True, json_encoder=json_encoder)[0] for d in D]
+            if type(jsonrpc_request) is list:
+                response = [self.response_dict(request, d, is_batch=True, json_encoder=json_encoder)[0] for d in jsonrpc_request]
                 status = 200
             else:
-                response, status = self.response_dict(request, D, json_encoder=json_encoder)
-                if response is None and (not u'id' in D or D[u'id'] is None): # a notification
+                response, status = self.response_dict(request, jsonrpc_request, json_encoder=json_encoder)
+                if response is None and (not u'id' in jsonrpc_request or jsonrpc_request[u'id'] is None): # a notification
                     return HttpResponse('', status=status)
 
             json_rpc = dumps(response, cls=json_encoder)
