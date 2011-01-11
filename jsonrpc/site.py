@@ -96,14 +96,12 @@ class JSONRPCSite(object):
         self._urls[unicode(name)] = method
 
     def empty_response(self, version='1.0'):
-        resp = {'id': None}
+        response = {'id': None, 'error': None, 'result': None}
         if version == '1.1':
-            resp['version'] = version
-            return resp
-        if version == '2.0':
-            resp['jsonrpc'] = version
-        resp.update({'error': None, 'result': None})
-        return resp
+            response['version'] = version
+        elif version == '2.0':
+            response['jsonrpc'] = version
+        return response
 
     def validate_get(self, request, method):
         method = unicode(method)
