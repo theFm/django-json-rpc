@@ -148,8 +148,8 @@ def encode_arg11(p):
 def validate_params(method, D):
     if type(D['params']) == Object:
         keys = method.signature_data["arguments"].keys()
-        if len(keys) != len(D['params']):
-            raise InvalidParamsError('Not eough params provided for %s' % method.signature)
+        if len(keys) > len(D['params']):
+            raise InvalidParamsError('Not enough params provided for %s' % method.signature)
         for k in keys:
             if not k in D['params']:
                 raise InvalidParamsError('%s is not a valid parameter for %s'

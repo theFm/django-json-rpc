@@ -8,7 +8,7 @@ def echo(request, string):
 
 
 @jsonrpc_method("jsonrpc.testAuth", authenticated=True)
-def echo_auth(requet, string):
+def echo_auth(request, string):
     return string
 
 

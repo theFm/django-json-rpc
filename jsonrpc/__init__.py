@@ -105,8 +105,6 @@ def jsonrpc_method(name, authenticated=False, safe=False, validate=False,
         rpc_method = RpcMethod(func, name, allow_get=safe)
         if authenticated:
             if authenticated is True:
-                rpc_method.prepend_argument("username", String)
-                rpc_method.prepend_argument("password", String)
                 from django.contrib.auth import authenticate
                 from django.contrib.auth.models import User
             else:
@@ -140,6 +138,9 @@ def jsonrpc_method(name, authenticated=False, safe=False, validate=False,
                     request.user = user
                 return rpc_method(request, *args, **kwargs)
             _func = RpcMethod(_func)
+            if authenticated is True:
+                rpc_method.prepend_argument("username", String)
+                rpc_method.prepend_argument("password", String)
         else:
             _func = rpc_method
         site.register(rpc_method.signature_data["method_name"], _func)
