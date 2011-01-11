@@ -86,10 +86,10 @@ class RpcMethod(object):
                 else:
                     if seen_positional_arguments:
                         raise ValueError("Positional arguments must occur before keyword arguments in %s" % repr(signature))
-                    arguments[str(idx) if len(argument_names) <= idx else arguments.keys()[idx]] = _eval_arg_type(argument, None, argument, signature)
+                    arguments[str(idx) if idx >= len(argument_names) else arguments.keys()[idx]] = _eval_arg_type(argument, None, argument, signature)
         return {"method_name": groups["method_name"] or func.__name__,
                 "arguments": arguments,
-                "return_type": groups["return_type"]}
+                "return_type": _eval_arg_type(groups["return_type"], Any, 'return', signature) if groups["return_type"] else Any}
 
     @property
     def signature_data(self):

@@ -236,7 +236,6 @@ class JsonRpcProtocolTestCase(TestCase):
         #
         #     <class 'jsonrpc.types.Any'> is not JSON serializable
         response = self.proxy10.system.describe()
-        #import pdb; pdb.set_trace()
         self.assertEqual(response["error"], None)
         self.assertEqual("procs" in response["result"], True)
         self.assertEqual(len(response["result"]["procs"]), 13)
