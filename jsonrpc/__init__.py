@@ -109,7 +109,7 @@ def jsonrpc_method(name, authenticated=False, safe=False, validate=False,
                 from django.contrib.auth.models import User
             else:
                 authenticate = authenticated
-            @wraps(rpc_method)
+            @wraps(func)
             def _func(request, *args, **kwargs):
                 user = getattr(request, 'user', None)
                 is_authenticated = getattr(user, 'is_authenticated', lambda: False)
@@ -136,13 +136,11 @@ def jsonrpc_method(name, authenticated=False, safe=False, validate=False,
                     if user is None:
                         raise InvalidCredentialsError
                     request.user = user
-                return rpc_method(request, *args, **kwargs)
-            _func = RpcMethod(_func)
+                return func(request, *args, **kwargs)
+            rpc_method.func = _func
             if authenticated is True:
-                rpc_method.prepend_argument("username", String)
                 rpc_method.prepend_argument("password", String)
-        else:
-            _func = rpc_method
-        site.register(rpc_method.signature_data["method_name"], _func)
-        return _func
+                rpc_method.prepend_argument("username", String)
+        site.register(rpc_method.signature_data["method_name"], rpc_method)
+        return rpc_method
     return decorator
