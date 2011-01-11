@@ -116,10 +116,23 @@ class JsonRpcProtocolTestCase(TestCase):
         self.assert_(u'error' not in resp)
 
     def test_11_GET(self):
-        pass
+        params = {u'1': u'this is a string'}
+        url = "%s%s?%s" % (
+            self.host, 'jsonrpc.safeEcho',
+            (''.join(['%s=%s&' % (k, urllib.quote(v)) for k, v in params.iteritems()])).rstrip('&')
+        )
+        resp = json.loads(self.client.get(url).content)
+        self.assertEqual(resp[u'result'], u'this is a string')
 
     def test_11_GET_unsafe(self):
-        pass
+        params = {"string": "x", "omg": "u", "wtf": "v", "nowai": "w", "yeswai": "z"}
+        url = "%s%s?%s" % (
+            self.host, 'jsonrpc.strangeEcho',
+            (''.join(['%s=%s&' % (k, urllib.quote(v)) for k, v in params.iteritems()])).rstrip('&')
+        )
+        resp = json.loads(self.client.get(url).content)
+        self.assertEqual("InvalidRequestError" in resp[u'error']["message"], True)
+        self.assertEqual("get" in resp[u'error']["message"].lower(), True)
 
     def test_11_GET_mixed_args(self):
         params = {u'1': u'this is a string', u'2': u'this is omg',

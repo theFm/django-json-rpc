@@ -106,19 +106,16 @@ class JSONRPCSite(object):
         return resp
 
     def validate_get(self, request, method):
-        encode_get_params = lambda r: dict([(k, v[0] if len(v) == 1 else v)
-                                            for k, v in r])
-        if request.method == 'GET':
-            method = unicode(method)
-            if method in self._urls and getattr(self._urls[method], 'json_safe', False):
-                D = {
-                  'params': encode_get_params(request.GET.lists()),
-                  'method': method,
-                  'id': 'jsonrpc',
-                  'version': '1.1'
-                }
-                return True, D
-        return False, {}
+        method = unicode(method)
+        if method not in self._urls or not getattr(self._urls[method], 'json_safe', False):
+            raise InvalidRequestError('The method you are trying to access is '
+                                      'not available by GET requests')
+        return {
+          'params': dict([(k, v[0] if len(v) == 1 else v) for k, v in request.GET.lists()]),
+          'method': method,
+          'id': 'jsonrpc',
+          'version': '1.1'
+        }
 
     def response_dict(self, request, D, is_batch=False, version_hint='1.0', json_encoder=None):
         json_encoder = json_encoder or self.json_encoder
@@ -197,10 +194,7 @@ class JSONRPCSite(object):
             # in case we do something json doesn't like, we always get back valid json-rpc response
             response = self.empty_response()
             if request.method.lower() == 'get':
-                valid, jsonrpc_request = self.validate_get(request, method)
-                if not valid:
-                    raise InvalidRequestError('The method you are trying to access is '
-                                              'not available by GET requests')
+                jsonrpc_request = self.validate_get(request, method)
             elif not request.method.lower() == 'post':
                 raise RequestPostError
             else:
