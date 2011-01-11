@@ -1,4 +1,7 @@
 from uuid import uuid1
+import re
+from inspect import getargspec
+from django.utils.datastructures import SortedDict
 from jsonrpc._json import loads, dumps
 from jsonrpc.exceptions import *
 from jsonrpc.types import *
@@ -17,6 +20,94 @@ from django.core.serializers.json import DjangoJSONEncoder
 
 NoneType = type(None)
 encode_kw = lambda p: dict([(str(k), v) for k, v in p.iteritems()])
+
+
+KWARG_RE = re.compile(r'(?P<argument_name>[a-zA-Z0-9_]+)\s*' \
+                      r'=\s*(?P<argument_type>[a-zA-Z]+)')
+SIGNATURE_RE = re.compile(r"(?P<method_name>[a-zA-Z0-9._]*)\s*" \
+                          r"(\((?P<argument_signature>[^)].*)?\)\s*" \
+                          r"(\->\s*(?P<return_type>.*))?)?")
+
+
+def _eval_arg_type(arg_type, T=Any, arg=None, sig=None):
+    """
+    Returns a type from a snippit of python source. Should normally be
+    something just like 'str' or 'Object'.
+
+      arg_type      the source to be evaluated
+      T             the default type
+      arg           context of where this type was extracted
+      sig           context from where the arg was extracted
+
+    Returns a type or a Type
+    """
+    try:
+        T = eval(arg_type)
+    except Exception, e:
+        raise ValueError('The type of %s could not be evaluated in %s for %s: %s' %
+                         (arg_type, arg, sig, str(e)))
+    else:
+        if type(T) not in (type, Type):
+            raise TypeError('%s is not a valid type in %s for %s' %
+                            (repr(T), arg, sig))
+        return T
+
+
+class RpcMethod(object):
+    def __init__(self, func, signature="", allow_get=False):
+        self.func = func
+        self.__doc__ = func.__doc__
+        self.__signature_data = self.parse_signature(func, signature)
+        self.__name__ = self.__signature_data["method_name"]
+        self.allow_get = allow_get
+
+    @classmethod
+    def parse_signature(cls, func, signature):
+        argument_names = getargspec(func)[0][2 if getattr(func, "__self__", False) else 1:]
+        arguments = SortedDict([(argument_name, Any) for argument_name in argument_names])
+        seen_positional_arguments = False
+        m = SIGNATURE_RE.match(signature)
+        if m is None:
+            raise ValueError("Invalid method signature %s" % repr(signature))
+        groups = m.groupdict()
+        if groups["argument_signature"] and groups["argument_signature"].strip():
+            for idx, argument in enumerate(groups["argument_signature"].strip().split(",")):
+                argument = argument.strip()
+                if "=" in argument:
+                    m = KWARG_RE.match(argument)
+                    if not m:
+                        raise ValueError("Can not parse argument type %s in %s" % (repr(argument), repr(signature)))
+                    argument_name = m.groupdict()["argument_name"].strip()
+                    argument_type = m.groupdict()["argument_type"].strip()
+                    if not (argument_name or argument_type):
+                        raise ValueError("Invalid keyword argument value %s in %s" % (repr(argument), repr(signature)))
+                    arguments[argument_name] = _eval_arg_type(argument_type, None, argument, signature)
+                    seen_positional_arguments = True
+                else:
+                    if seen_positional_arguments:
+                        raise ValueError("Positional arguments must occur before keyword arguments in %s" % repr(signature))
+                    arguments[str(idx) if len(argument_names) <= idx else arguments.keys()[idx]] = _eval_arg_type(argument, None, argument, signature)
+        return {"method_name": groups["method_name"] or func.__name__,
+                "arguments": arguments,
+                "return_type": groups["return_type"]}
+
+    @property
+    def signature_data(self):
+        return self.__signature_data
+
+    @property
+    def signature(self):
+        signature = self.__signature_data["method_name"]
+        signature += "(%s)" % ", ".join(["%s=%s" % item for item in self.__signature_data["arguments"].items()])
+        if self.__signature_data["return_type"]:
+            signature += " -> %s" % self.__signature_data["return_type"]
+        return signature
+
+    def prepend_argument(self, argument_name, argument_type=Any):
+        self.__signature_data["arguments"].insert(0, argument_name, argument_type)
+
+    def __call__(self, request, *args, **kwargs):
+        return self.func(request, *args, **kwargs)
 
 
 def encode_kw11(p):
@@ -56,30 +147,30 @@ def encode_arg11(p):
 
 def validate_params(method, D):
     if type(D['params']) == Object:
-        keys = method.json_arg_types.keys()
+        keys = method.signature_data["arguments"].keys()
         if len(keys) != len(D['params']):
-            raise InvalidParamsError('Not eough params provided for %s' % method.json_sig)
+            raise InvalidParamsError('Not eough params provided for %s' % method.signature)
         for k in keys:
             if not k in D['params']:
                 raise InvalidParamsError('%s is not a valid parameter for %s'
-                                         % (k, method.json_sig))
-            if not Any.kind(D['params'][k]) == method.json_arg_types[k]:
+                                         % (k, method.signature))
+            if not Any.kind(D['params'][k]) == method.signature_data["arguments"][k]:
                 raise InvalidParamsError('%s is not the correct type %s for %s'
                                           % (type(D['params'][k]),
-                                             method.json_arg_types[k],
-                                             method.json_sig))
+                                             method.signature_data["arguments"][k],
+                                             method.signature))
     elif type(D['params']) == Array:
-        arg_types = method.json_arg_types.values()
+        arg_types = method.signature_data["arguments"].values()
         try:
             for i, arg in enumerate(D['params']):
                 if not Any.kind(arg) == arg_types[i]:
                     raise InvalidParamsError('%s is not the correct type %s for %s'
-                          % (type(arg), arg_types[i], method.json_sig))
+                          % (type(arg), arg_types[i], method.signature))
         except IndexError:
-            raise InvalidParamsError('Too many params provided for %s' % method.json_sig)
+            raise InvalidParamsError('Too many params provided for %s' % method.signature)
         else:
             if len(D['params']) != len(arg_types):
-                raise InvalidParamsError('Not enough params provided for %s' % method.json_sig)
+                raise InvalidParamsError('Not enough params provided for %s' % method.signature)
 
 
 class JSONRPCSite(object):
@@ -89,7 +180,7 @@ class JSONRPCSite(object):
         self.uuid = str(uuid1())
         self.version = version
         self.name = name
-        self.register("system.describe", self.describe)
+        self.register("system.describe", RpcMethod(self.describe, "system.describe"))
         self.json_encoder = json_encoder
 
     def register(self, name, method):
@@ -105,7 +196,7 @@ class JSONRPCSite(object):
 
     def validate_get(self, request, method):
         method = unicode(method)
-        if method not in self._urls or not getattr(self._urls[method], 'json_safe', False):
+        if method not in self._urls or not getattr(self._urls[method], 'allow_get', False):
             raise InvalidRequestError('The method you are trying to access is '
                                       'not available by GET requests')
         return {
@@ -142,8 +233,7 @@ class JSONRPCSite(object):
                 request.jsonrpc_version = '1.0'
 
             method = self._urls[str(D['method'])]
-            if getattr(method, 'json_validate', False):
-                validate_params(method, D)
+            validate_params(method, D)
             R = apply_version[version](method, request, D['params'])
 
             encoder = json_encoder()
@@ -233,12 +323,12 @@ class JSONRPCSite(object):
     def procedure_desc(self, key):
         M = self._urls[key]
         return {
-            'name': M.json_method,
+            'name': M.signature_data["method_name"],
             'summary': M.__doc__,
-            'idempotent': M.json_safe,
+            'idempotent': M.allow_get,
             'params': [{'type': str(Any.kind(t)), 'name': k}
-                for k, t in M.json_arg_types.iteritems()],
-            'return': {'type': str(M.json_return_type)}}
+                for k, t in M.signature_data["arguments"].iteritems()],
+            'return': {'type': str(M.signature_data["return_type"])}}
 
     def service_desc(self):
         return {

@@ -3,7 +3,8 @@ import urllib
 from django.test import TestCase
 from django.utils import simplejson as json
 from django.contrib.auth.models import User
-from jsonrpc import jsonrpc_method, Any, SortedDict
+from jsonrpc import jsonrpc_method, Any
+from django.utils.datastructures import SortedDict
 from jsonrpc.exceptions import InvalidParamsError, InvalidCredentialsError
 from jsonrpc.proxy import TestServiceProxy, JsonRpcTestClient
 from jsonrpc import RpcMethod
@@ -235,10 +236,11 @@ class JsonRpcProtocolTestCase(TestCase):
         #
         #     <class 'jsonrpc.types.Any'> is not JSON serializable
         response = self.proxy10.system.describe()
+        #import pdb; pdb.set_trace()
         self.assertEqual(response["error"], None)
         self.assertEqual("procs" in response["result"], True)
-        self.assertEqual(len(response["result"]["procs"]), 12)
+        self.assertEqual(len(response["result"]["procs"]), 13)
         response = self.proxy20.system.describe()
         self.assertEqual(response["error"], None)
         self.assertEqual("procs" in response["result"], True)
-        self.assertEqual(len(response["result"]["procs"]), 12)
+        self.assertEqual(len(response["result"]["procs"]), 13)
