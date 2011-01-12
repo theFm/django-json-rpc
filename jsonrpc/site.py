@@ -1,6 +1,7 @@
 from uuid import uuid1
 import re
 from inspect import getargspec
+from django.http import HttpResponse
 from django.utils.datastructures import SortedDict
 from django.contrib.auth import authenticate
 from jsonrpc._json import loads, dumps
@@ -304,7 +305,8 @@ class JSONRPCSite(object):
 
     @csrf_exempt
     def dispatch(self, request, method='', json_encoder=None):
-        from django.http import HttpResponse
+        if request.method.lower() == "options":
+            return self.preflight(request)
         json_encoder = json_encoder or self.json_encoder
 
         try:
@@ -345,8 +347,6 @@ class JSONRPCSite(object):
             json_rpc = dumps(response, cls=json_encoder)
 
         response = HttpResponse(json_rpc, status=status, content_type='application/json-rpc')
-        response['Access-Control-Allow-Origin'] = '*'
-        response['Access-Control-Allow-Headers'] = 'Content-Type'
         return response
 
     def procedure_desc(self, key):
@@ -372,6 +372,18 @@ class JSONRPCSite(object):
 
     def describe(self, request):
         return self.service_desc()
+
+    def preflight(self, request):
+        accepts = request.META.get("HTTP_ACCEPT", "")
+        content_type = "text/plain"
+        for c_type in "application/json-rpc application/xml text/html".split():
+            if c_type in accepts:
+                content_type = c_type
+                break
+        response = HttpResponse(status=200, content_type=content_type)
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS"
+        return response
 
 
 jsonrpc_site = JSONRPCSite("django-json-rpc")
