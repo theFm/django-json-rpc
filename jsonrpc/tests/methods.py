@@ -33,8 +33,8 @@ def safe_echo(request, string):
 
 
 @jsonrpc_method("jsonrpc.strangeSafeEcho", safe=True)
-def strange_safe_echo(request, *args, **kwargs):
-    return strange_echo(request, *args, **kwargs)
+def strange_safe_echo(request, string, omg, wtf, nowai, yeswai="Default"):
+    return strange_echo(request, string, omg, wtf, nowai, yeswai)
 
 
 @jsonrpc_method("jsonrpc.checkedEcho(string=str, string2=str) -> str",

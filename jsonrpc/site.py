@@ -175,32 +175,23 @@ def encode_arg11(p):
         return [d[str(i)] for i in pos]
 
 
-def validate_params(method, D):
-    if type(D['params']) == Object:
-        keys = method.signature_data["arguments"].keys()
-        if len(keys) > len(D['params']):
-            raise InvalidParamsError('Not enough params provided for %s' % method.signature)
-        for k in keys:
-            if not k in D['params']:
-                raise InvalidParamsError('%s is not a valid parameter for %s'
-                                         % (k, method.signature))
-            if not Any.kind(D['params'][k]) == method.signature_data["arguments"][k]:
-                raise InvalidParamsError('%s is not the correct type %s for %s'
-                                          % (type(D['params'][k]),
-                                             method.signature_data["arguments"][k],
-                                             method.signature))
-    elif type(D['params']) == Array:
-        arg_types = method.signature_data["arguments"].values()
-        try:
-            for i, arg in enumerate(D['params']):
-                if not Any.kind(arg) == arg_types[i]:
-                    raise InvalidParamsError('%s is not the correct type %s for %s'
-                          % (type(arg), arg_types[i], method.signature))
-        except IndexError:
-            raise InvalidParamsError('Too many params provided for %s' % method.signature)
+def validate_params(method, *args, **kwargs):
+    keys = method.signature_data["arguments"].keys()
+    if len(args) + len(kwargs) < len(keys):
+        raise InvalidParamsError('Not enough params provided for %s' % method.signature)
+    elif len(args) + len(kwargs) > len(keys):
+        raise InvalidParamsError('Too many params provided for %s' % method.signature)
+    for idx, argument in enumerate(method.signature_data["arguments"].items()):
+        if idx < len(args):
+            if argument[0] in kwargs:
+                raise InvalidParamsError("Ambiguous argument \"%s\"" % argument[0])
+            if not Any.kind(args[idx]) == argument[1]:
+                raise InvalidParamsError('%s is not the correct type %s for %s' % (type(args[idx]), argument[0], method.signature))
         else:
-            if len(D['params']) != len(arg_types):
-                raise InvalidParamsError('Not enough params provided for %s' % method.signature)
+            if argument[0] not in kwargs:
+                raise InvalidParamsError("Missing argument \"%s\"" % argument[0])
+            if not Any.kind(kwargs[argument[0]]) == argument[1]:
+                raise InvalidParamsError('%s is not the correct type %s for %s' % (type(kwargs[argument[0]]), argument[0], method.signature))
 
 
 class JSONRPCSite(object):
@@ -240,9 +231,9 @@ class JSONRPCSite(object):
         json_encoder = json_encoder or self.json_encoder
         version = version_hint
         response = self.empty_response(version=version)
-        apply_version = {'2.0': lambda f, r, p: f(r, **encode_kw(p)) if type(p) is dict else f(r, *p),
-                         '1.1': lambda f, r, p: f(r, *encode_arg11(p), **encode_kw(encode_kw11(p))),
-                         '1.0': lambda f, r, p: f(r, *p)}
+        apply_version = {"2.0": lambda p: ([], encode_kw(p)) if type(p) is dict else (p, {}),
+                         "1.1": lambda p: (encode_arg11(p), encode_kw(encode_kw11(p))),
+                         "1.0": lambda p: (p, {})}
 
         try:
             if 'method' not in D or 'params' not in D:
@@ -263,8 +254,9 @@ class JSONRPCSite(object):
                 request.jsonrpc_version = '1.0'
 
             method = self._urls[str(D['method'])]
-            validate_params(method, D)
-            R = apply_version[version](method, request, D['params'])
+            args, kwargs = apply_version[version](D["params"])
+            validate_params(method, *args, **kwargs)
+            R = method(request, *args, **kwargs)
 
             encoder = json_encoder()
             if not sum(map(lambda e: isinstance(R, e), # type of `R` should be one of these or...

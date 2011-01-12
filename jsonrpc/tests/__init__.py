@@ -41,7 +41,7 @@ class JsonRpcFunctionalTestCase(unittest.TestCase):
     def test_validate_args(self):
         sig = 'jsonrpc(String, String) -> String'
         M = jsonrpc_method(sig, validate=True)(lambda r, s1, s2: s1+s2)
-        self.assert_(validate_params(M, {'params': ['omg', u'wtf']}) is None)
+        self.assert_(validate_params(M, 'omg', u'wtf') is None)
 
         E = None
         try:
@@ -53,9 +53,9 @@ class JsonRpcFunctionalTestCase(unittest.TestCase):
     def test_validate_args_any(self):
         sig = 'jsonrpc(s1=Any, s2=Any)'
         M = jsonrpc_method(sig, validate=True)(lambda r, s1, s2: s1+s2)
-        self.assert_(validate_params(M, {'params': ['omg', 'wtf']}) is None)
-        self.assert_(validate_params(M, {'params': [['omg'], ['wtf']]}) is None)
-        self.assert_(validate_params(M, {'params': {'s1': 'omg', 's2': 'wtf'}}) is None)
+        self.assert_(validate_params(M, *['omg', 'wtf']) is None)
+        self.assert_(validate_params(M, *[['omg'], ['wtf']]) is None)
+        self.assert_(validate_params(M, **{'s1': 'omg', 's2': 'wtf'}) is None)
 
     def test_types(self):
         assert type(u'') == String
