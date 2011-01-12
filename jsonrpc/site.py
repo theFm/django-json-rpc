@@ -2,6 +2,7 @@ from uuid import uuid1
 import re
 from inspect import getargspec
 from django.utils.datastructures import SortedDict
+from django.contrib.auth import authenticate
 from jsonrpc._json import loads, dumps
 from jsonrpc.exceptions import *
 from jsonrpc.types import *
@@ -108,6 +109,34 @@ class RpcMethod(object):
 
     def __call__(self, request, *args, **kwargs):
         return self.func(request, *args, **kwargs)
+
+
+class AuthenticatedRpcMethod(RpcMethod):
+    def __init__(self, *args, **kwargs):
+        super(AuthenticatedRpcMethod, self).__init__(*args, **kwargs)
+        self.prepend_argument("password", String)
+        self.prepend_argument("username", String)
+
+    def __call__(self, request, *args, **kwargs):
+        user = None
+        try:
+            username, password = args[:2]
+            user = authenticate(username=username, password=password)
+            if user is not None:
+                args = args[2:]
+        except ValueError:
+            if "username" in kwargs and "password" in kwargs:
+                user = authenticate(username=kwargs["username"],
+                                    password=kwargs["password"])
+                if user is not None:
+                    kwargs.pop("username")
+                    kwargs.pop("password")
+                else:
+                    raise InvalidParamsError("Authenticated methods require at least [username, password] or {username: password:} arguments")
+            if user is None:
+                raise InvalidCredentialsError
+            request.user = user
+        return super(AuthenticatedRpcMethod, self).__call__(request, *args, **kwargs)
 
 
 def encode_kw11(p):
