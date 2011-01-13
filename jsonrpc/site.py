@@ -339,6 +339,7 @@ class JSONRPCSite(object):
             json_rpc = dumps(response, cls=json_encoder)
 
         response = HttpResponse(json_rpc, status=status, content_type='application/json-rpc')
+        response["Access-Control-Allow-Origin"] = "*"
         return response
 
     def procedure_desc(self, key):
@@ -375,6 +376,9 @@ class JSONRPCSite(object):
         response = HttpResponse(status=200, content_type=content_type)
         response["Access-Control-Allow-Origin"] = "*"
         response["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS"
+        # TODO Use a whitelist of allowed headers
+        response["Access-Control-Allow-Headers"] = request.META.get(
+                                     "HTTP_ACCESS_CONTROL_REQUEST_HEADERS", "")
         return response
 
 
