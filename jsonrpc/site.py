@@ -136,7 +136,7 @@ class AuthenticatedRpcMethod(RpcMethod):
                     raise InvalidParamsError("Authenticated methods require at least [username, password] or {username: password:} arguments")
             if user is None:
                 raise InvalidCredentialsError
-            request.user = user
+        request.user = user
         return super(AuthenticatedRpcMethod, self).__call__(request, *args, **kwargs)
 
 
