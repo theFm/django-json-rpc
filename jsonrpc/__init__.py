@@ -15,40 +15,6 @@ SIG_RE = re.compile(
   r'\s*(\->\s*(?P<return_sig>.*))?)?\s*$')
 
 
-class JSONRPCTypeCheckingUnavailable(Exception):
-    pass
-
-
-def _type_checking_available(sig='', validate=False):
-    if not hasattr(type, '__eq__') and validate: # and False:
-        raise JSONRPCTypeCheckingUnavailable(
-          'Type checking is not available in your version of Python '
-          'which is only available in Python 2.6 or later. Use Python 2.6 '
-          'or later or disable type checking in %s' % sig)
-
-
-def _inject_args(sig, types):
-    """
-    A function to inject arguments manually into a method signature before
-    it's been parsed. If using keyword arguments use 'kw=type' instead in
-    the types array.
-
-      sig     the string signature
-      types   a list of types to be inserted
-
-    Returns the altered signature.
-    """
-    if '(' in sig:
-        parts = sig.split('(')
-        sig = '%s(%s%s%s' % (
-          parts[0], ', '.join(types),
-          (', ' if parts[1].index(')') > 0 else ''), parts[1]
-        )
-    else:
-        sig = '%s(%s)' % (sig, ', '.join(types))
-    return sig
-
-
 def jsonrpc_method(name, authenticated=False, safe=False, validate=False,
                    site=default_site):
     """
