@@ -3,13 +3,11 @@ import urllib
 from django.test import TestCase
 from django.utils import simplejson as json
 from django.contrib.auth.models import User
-from jsonrpc import jsonrpc_method, Any
 from django.utils.datastructures import SortedDict
 from jsonrpc.exceptions import InvalidParamsError, InvalidCredentialsError
 from jsonrpc.proxy import TestServiceProxy, JsonRpcTestClient
-from jsonrpc import RpcMethod
-from jsonrpc.site import validate_params
-from jsonrpc.types import String, Object, Array, Nil, Number
+from jsonrpc.site import validate_params, jsonrpc_site, RpcMethod
+from jsonrpc.types import String, Object, Array, Nil, Number, Any
 
 
 # Register JSON-RPC methods
@@ -40,7 +38,7 @@ class RpcMethodClassTestCase(unittest.TestCase):
 class JsonRpcFunctionalTestCase(unittest.TestCase):
     def test_validate_args(self):
         sig = 'jsonrpc(String, String) -> String'
-        M = jsonrpc_method(sig, validate=True)(lambda r, s1, s2: s1+s2)
+        M = jsonrpc_site.register(sig)(lambda r, s1, s2: s1+s2)
         self.assert_(validate_params(M, 'omg', u'wtf') is None)
 
         E = None
@@ -52,7 +50,7 @@ class JsonRpcFunctionalTestCase(unittest.TestCase):
 
     def test_validate_args_any(self):
         sig = 'jsonrpc(s1=Any, s2=Any)'
-        M = jsonrpc_method(sig, validate=True)(lambda r, s1, s2: s1+s2)
+        M = jsonrpc_site.register(sig)(lambda r, s1, s2: s1+s2)
         self.assert_(validate_params(M, *['omg', 'wtf']) is None)
         self.assert_(validate_params(M, *[['omg'], ['wtf']]) is None)
         self.assert_(validate_params(M, **{'s1': 'omg', 's2': 'wtf'}) is None)
@@ -238,8 +236,8 @@ class JsonRpcProtocolTestCase(TestCase):
         response = self.proxy10.system.describe()
         self.assertEqual(response["error"], None)
         self.assertEqual("procs" in response["result"], True)
-        self.assertEqual(len(response["result"]["procs"]), 13)
+        self.assertEqual(len(response["result"]["procs"]), 12)
         response = self.proxy20.system.describe()
         self.assertEqual(response["error"], None)
         self.assertEqual("procs" in response["result"], True)
-        self.assertEqual(len(response["result"]["procs"]), 13)
+        self.assertEqual(len(response["result"]["procs"]), 12)

@@ -201,11 +201,18 @@ class JSONRPCSite(object):
         self.uuid = str(uuid1())
         self.version = version
         self.name = name
-        self.register("system.describe", RpcMethod(self.describe, "system.describe"))
+        self.describe = self.register("system.describe")(self.describe)
         self.json_encoder = json_encoder
 
-    def register(self, name, method):
-        self._urls[unicode(name)] = method
+    def register(self, name, authenticated=False, safe=False):
+        def decorator(method):
+            if authenticated:
+                rpc_method = AuthenticatedRpcMethod(method, name, allow_get=safe)
+            else:
+                rpc_method = RpcMethod(method, name, allow_get=safe)
+            self._urls[unicode(rpc_method.signature_data["method_name"])] = rpc_method
+            return rpc_method
+        return decorator
 
     def empty_response(self, version='1.0'):
         response = {'id': None, 'error': None, 'result': None}
