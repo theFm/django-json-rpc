@@ -65,8 +65,10 @@ class RpcMethod(object):
 
     @classmethod
     def parse_signature(cls, func, signature):
-        argument_names = getargspec(func)[0][2 if getattr(func, "__self__", False) else 1:]
-        arguments = SortedDict([(argument_name, Any) for argument_name in argument_names])
+        bound_method = getattr(func, "__self__", None) is not None
+        argspec = getargspec(func)
+        argument_names = argspec.args[2 if bound_method else 1:]
+        arguments = SortedDict([(arg, Any) for arg in argument_names])
         seen_positional_arguments = False
         m = SIGNATURE_RE.match(signature)
         if m is None:
@@ -89,8 +91,15 @@ class RpcMethod(object):
                     if seen_positional_arguments:
                         raise ValueError("Positional arguments must occur before keyword arguments in %s" % repr(signature))
                     arguments[str(idx) if idx >= len(argument_names) else arguments.keys()[idx]] = _eval_arg_type(argument, None, argument, signature)
+        if argspec.defaults:
+            defaults = SortedDict()
+            for idx, arg in enumerate(arguments.keys()[-len(argspec.defaults):]):
+                defaults[arg] = argspec.defaults[idx]
+        else:
+            defaults = {}
         return {"method_name": groups["method_name"] or func.__name__,
                 "arguments": arguments,
+                "defaults": defaults,
                 "return_type": _eval_arg_type(groups["return_type"], Any, 'return', signature) if groups["return_type"] else Any}
 
     @property
@@ -177,7 +186,8 @@ def encode_arg11(p):
 
 def validate_params(method, *args, **kwargs):
     keys = method.signature_data["arguments"].keys()
-    if len(args) + len(kwargs) < len(keys):
+    defaults = method.signature_data["defaults"]
+    if len(args) + len(kwargs) < len(keys) - len(defaults):
         raise InvalidParamsError('Not enough params provided for %s' % method.signature)
     elif len(args) + len(kwargs) > len(keys):
         raise InvalidParamsError('Too many params provided for %s' % method.signature)
@@ -188,9 +198,9 @@ def validate_params(method, *args, **kwargs):
             if not Any.kind(args[idx]) == argument[1]:
                 raise InvalidParamsError('%s is not the correct type %s for %s' % (type(args[idx]), argument[0], method.signature))
         else:
-            if argument[0] not in kwargs:
+            if argument[0] not in kwargs and argument[0] not in defaults:
                 raise InvalidParamsError("Missing argument \"%s\"" % argument[0])
-            if not Any.kind(kwargs[argument[0]]) == argument[1]:
+            if argument[0] in kwargs and not Any.kind(kwargs[argument[0]]) == argument[1]:
                 raise InvalidParamsError('%s is not the correct type %s for %s' % (type(kwargs[argument[0]]), argument[0], method.signature))
 
 
