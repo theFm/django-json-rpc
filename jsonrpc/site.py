@@ -210,7 +210,7 @@ def validate_params(method, *args, **kwargs):
                 raise InvalidParamsError('%s is not the correct type %s for %s' % (type(kwargs[argument[0]]), argument[0], method.signature))
 
 
-class JSONRPCSite(object):
+class JsonRpcSite(object):
     "A JSON-RPC Site"
     def __init__(self, name, version="1.0", json_encoder=DjangoJSONEncoder):
         self._urls = {}
@@ -409,7 +409,7 @@ def setup_default_site():
     global default_site
     site_class = app_settings.DEFAULT_SITE
     if site_class is None:
-        default_site = JSONRPCSite("jsonrpc")
+        default_site = JsonRpcSite("jsonrpc")
         return
     if isinstance(site_class, (str, unicode)):
         module_name, class_name = site_class.rsplit('.', 1)
