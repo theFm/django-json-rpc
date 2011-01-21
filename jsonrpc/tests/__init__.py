@@ -25,14 +25,74 @@ class RpcMethodClassTestCase(unittest.TestCase):
 
     def test_rpc_method_signature_extraction(self):
         rpc_method = RpcMethod(self.add_method)
-        self.assertEqual(RpcMethod.parse_signature(self.no_arg_method, ""), {"method_name": "no_arg_method", "arguments": SortedDict(), "defaults": {}, "return_type": Any})
-        self.assertEqual(RpcMethod.parse_signature(self.no_arg_method, "rpc_method"), {"method_name": "rpc_method", "arguments": SortedDict(), "defaults": {}, "return_type": Any})
-        self.assertEqual(RpcMethod.parse_signature(self.no_arg_method, "namespace.rpc_method"), {"method_name": "namespace.rpc_method", "arguments": SortedDict(), "defaults": {}, "return_type": Any})
-        self.assertEqual(RpcMethod.parse_signature(self.no_arg_method, "namespace.rpc_method() -> Number"), {"method_name": "namespace.rpc_method", "arguments": SortedDict(), "defaults": {}, "return_type": Number})
-        self.assertEqual(RpcMethod.parse_signature(self.add_method, "namespace.rpc_method(Number, Number) -> Number"), {"method_name": "namespace.rpc_method", "arguments": SortedDict([("param1", Number), ("param2", Number)]), "defaults": {}, "return_type": Number})
-        self.assertEqual(RpcMethod.parse_signature(self.add_method, "namespace.rpc_method(String, String) -> String"), {"method_name": "namespace.rpc_method", "arguments": SortedDict([("param1", String), ("param2", String)]), "defaults": {}, "return_type": String})
-        self.assertEqual(RpcMethod.parse_signature(self.add_method, "namespace.rpc_method(param1=String, param2=String) -> String"), {"method_name": "namespace.rpc_method", "arguments": SortedDict([("param1", String), ("param2", String)]), "defaults": {}, "return_type": String})
-        self.assertEqual(RpcMethod.parse_signature(self.add_method, "namespace.rpc_method(String, param2=String) -> String"), {"method_name": "namespace.rpc_method", "arguments": SortedDict([("param1", String), ("param2", String)]), "defaults": {}, "return_type": String})
+        signature = {
+            "method_name": "no_arg_method",
+            "arguments": SortedDict(),
+            "defaults": {},
+            "return_type": Any
+        }
+        self.assertEqual(RpcMethod.parse_signature(self.no_arg_method, ""),
+                                                                     signature)
+        signature = {
+            "method_name": "rpc_method",
+            "arguments": SortedDict(),
+            "defaults": {},
+            "return_type": Any
+        }
+        self.assertEqual(RpcMethod.parse_signature(self.no_arg_method,
+                                                      "rpc_method"), signature)
+        signature = {
+            "method_name": "namespace.rpc_method",
+            "arguments": SortedDict(),
+            "defaults": {},
+            "return_type": Any
+        }
+        self.assertEqual(RpcMethod.parse_signature(self.no_arg_method,
+                                            "namespace.rpc_method"), signature)
+        signature = {
+            "method_name": "namespace.rpc_method",
+            "arguments": SortedDict(),
+            "defaults": {},
+            "return_type": Number
+        }
+        self.assertEqual(RpcMethod.parse_signature(self.no_arg_method,
+                                "namespace.rpc_method() -> Number"), signature)
+        signature = {
+            "method_name": "namespace.rpc_method",
+            "arguments": SortedDict([("param1", Number), ("param2", Number)]),
+            "defaults": {},
+            "return_type": Number
+        }
+        self.assertEqual(RpcMethod.parse_signature(self.add_method,
+                  "namespace.rpc_method(Number, Number) -> Number"), signature)
+        signature = {
+            "method_name": "namespace.rpc_method",
+            "arguments": SortedDict([("param1", String), ("param2", String)]),
+            "defaults": {},
+            "return_type": String
+        }
+        self.assertEqual(RpcMethod.parse_signature(self.add_method,
+                  "namespace.rpc_method(String, String) -> String"), signature)
+        signature = {
+            "method_name": "namespace.rpc_method",
+            "arguments": SortedDict([("param1", String), ("param2", String)]),
+            "defaults": {},
+            "return_type": String
+        }
+        self.assertEqual(RpcMethod.parse_signature(
+            self.add_method,
+            "namespace.rpc_method(param1=String, param2=String) -> String"
+        ), signature)
+        signature = {
+            "method_name": "namespace.rpc_method",
+            "arguments": SortedDict([("param1", String), ("param2", String)]),
+            "defaults": {},
+            "return_type": String
+        }
+        self.assertEqual(RpcMethod.parse_signature(
+            self.add_method,
+            "namespace.rpc_method(String, param2=String) -> String"
+        ), signature)
 
 
 class JsonRpcFunctionalTestCase(unittest.TestCase):
