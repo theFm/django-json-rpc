@@ -8,6 +8,7 @@ import jsonrpc.tests.methods
 
 urlpatterns = patterns('',
     (r'^json/browse/', "jsonrpc.views.browse", {}, "jsonrpc_browser"),
+    (r'^json/documentation/$', default_site.documentation, {}, 'jsonrpc_documentation'),
     (r'^json/(?P<method>[a-zA-Z0-9.]+)$', default_site.dispatch),
     (r'^json/', default_site.dispatch, {}, "jsonrpc_mountpoint"),
 )

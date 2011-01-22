@@ -4,6 +4,8 @@ from inspect import getargspec
 from django.core.exceptions import ImproperlyConfigured
 from django.core import signals
 from django.http import HttpResponse
+from django.shortcuts import render_to_response
+from django.template.context import RequestContext
 from django.utils.datastructures import SortedDict
 from django.utils.importlib import import_module
 from django.contrib.auth import authenticate
@@ -387,7 +389,13 @@ class JsonRpcSite(object):
                     if self._urls[k] != self.describe]}
 
     def describe(self, request):
+        """Summarize service and the methods provided."""
         return self.service_desc()
+
+    def documentation(self, request):
+        return render_to_response("jsonrpc/documentation/index.html",
+                                  {"service": self.service_desc()},
+                                  context_instance=RequestContext(request))
 
     def preflight(self, request):
         accepts = request.META.get("HTTP_ACCEPT", "")

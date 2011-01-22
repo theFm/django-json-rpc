@@ -1,0 +1,37 @@
+{% extends "jsonrpc/base.html" %}
+{% load markup %}
+
+
+{% block content %}
+<h1>Service Description</h1>
+<h2>Service name</h2>
+<div>{{ service.name }}</div>
+
+<h2>Version</h2>
+<div>{{ service.version }}</div>
+
+<h2>Summary</h2>
+<div>{{ service.summary|restructuredtext }}</div>
+
+<h2>Service ID</h2>
+<div>{{ service.id }}</div>
+
+<h2>Method</h2>
+{% for proc in service.procs %}<div class="method">
+  <h3>{{ proc.name }}</h3>
+  {% if proc.idempotent %}<p>[idempotent]</p>{% endif %}
+  {{ proc.summary|restructuredtext }}
+
+  <h4>Parameters</h4>
+  {% if proc.params %}
+    {% for param in proc.params %}
+      <li>{{ param.name }}: {{ param.type }} type.</li>
+    {% endfor %}
+  {% else %}
+    <p>This method takes no parameters.</p>
+  {% endif %}
+
+  <h4>Return Type</h4>
+  <p>{{ proc.return.type }}</p>
+</div>{% empty %}<div>No procedures.</div>{% endfor%}
+{% endblock content %}
