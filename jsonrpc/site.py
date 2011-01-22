@@ -375,7 +375,7 @@ class JsonRpcSite(object):
             'idempotent': M.allow_get,
             'params': [{'type': str(Any.kind(t)), 'name': k}
                 for k, t in M.signature_data["arguments"].iteritems()],
-            'return': {'type': str(M.signature_data["return_type"])},
+            'return_type': str(M.signature_data["return_type"]),
         }
 
     def service_desc(self):
