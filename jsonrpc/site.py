@@ -64,12 +64,12 @@ def _eval_arg_type(arg_type, T=Any, arg=None, sig=None):
 
 
 class RpcMethod(object):
-    def __init__(self, func, signature="", allow_get=False):
+    def __init__(self, func, signature="", idempotent=False):
         self.func = func
         self.__doc__ = func.__doc__
         self.__signature_data = self.parse_signature(func, signature)
         self.__name__ = self.__signature_data["method_name"]
-        self.allow_get = allow_get
+        self.idempotent = idempotent
 
     @classmethod
     def parse_signature(cls, func, signature):
@@ -222,12 +222,12 @@ class JsonRpcSite(object):
         self.describe = self.register("system.describe")(self.describe)
         self.json_encoder = json_encoder
 
-    def register(self, name, authenticated=False, safe=False):
+    def register(self, name, authenticated=False, idempotent=False):
         def decorator(method):
             if authenticated:
-                rpc_method = AuthenticatedRpcMethod(method, name, allow_get=safe)
+                rpc_method = AuthenticatedRpcMethod(method, name, idempotent=idempotent)
             else:
-                rpc_method = RpcMethod(method, name, allow_get=safe)
+                rpc_method = RpcMethod(method, name, idempotent=idempotent)
             self._urls[unicode(rpc_method.signature_data["method_name"])] = rpc_method
             return rpc_method
         return decorator
@@ -242,7 +242,7 @@ class JsonRpcSite(object):
 
     def validate_get(self, request, method):
         method = unicode(method)
-        if method not in self._urls or not getattr(self._urls[method], 'allow_get', False):
+        if method not in self._urls or not getattr(self._urls[method], 'idempotent', False):
             raise InvalidRequestError('The method you are trying to access is '
                                       'not available by GET requests')
         return {
@@ -372,7 +372,7 @@ class JsonRpcSite(object):
         return {
             'name': M.signature_data["method_name"],
             'summary': M.__doc__,
-            'idempotent': M.allow_get,
+            'idempotent': M.idempotent,
             'params': [{'type': str(Any.kind(t)), 'name': k}
                 for k, t in M.signature_data["arguments"].iteritems()],
             'return_type': str(M.signature_data["return_type"]),

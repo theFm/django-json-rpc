@@ -27,18 +27,18 @@ def strange_echo(request, string, omg, wtf, nowai, yeswai="Default"):
     return [string, omg, wtf, nowai, yeswai]
 
 
-@default_site.register("jsonrpc.safeEcho", safe=True)
+@default_site.register("jsonrpc.safeEcho", idempotent=True)
 def safe_echo(request, string):
     return string
 
 
-@default_site.register("jsonrpc.strangeSafeEcho", safe=True)
+@default_site.register("jsonrpc.strangeSafeEcho", idempotent=True)
 def strange_safe_echo(request, string, omg, wtf, nowai, yeswai="Default"):
     return strange_echo(request, string, omg, wtf, nowai, yeswai)
 
 
 @default_site.register("jsonrpc.checkedEcho(string=str, string2=str) -> str",
-                                                                     safe=True)
+                                                               idempotent=True)
 def protected_echo(request, string, string2):
     return string + string2
 
