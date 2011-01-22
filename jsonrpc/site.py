@@ -219,15 +219,15 @@ class JsonRpcSite(object):
         self.uuid = str(uuid1())
         self.version = version
         self.name = name
-        self.describe = self.register("system.describe")(self.describe)
+        self.describe = self.register("system.describe", public=True)(self.describe)
         self.json_encoder = json_encoder
 
-    def register(self, name, authenticated=False, idempotent=False):
+    def register(self, name, public=False, idempotent=False):
         def decorator(method):
             rpc_method = {
-                True: AuthenticatedRpcMethod,
-                False: RpcMethod,
-            }[authenticated](method, name, idempotent=idempotent)
+                True: RpcMethod,
+                False: AuthenticatedRpcMethod,
+            }[public](method, name, idempotent=idempotent)
             method_name = unicode(rpc_method.signature_data["method_name"])
             self._urls[method_name] = rpc_method
             return rpc_method

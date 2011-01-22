@@ -98,7 +98,7 @@ class RpcMethodClassTestCase(unittest.TestCase):
 class JsonRpcFunctionalTestCase(unittest.TestCase):
     def test_validate_args(self):
         sig = 'jsonrpc(String, String) -> String'
-        M = default_site.register(sig)(lambda r, s1, s2: s1+s2)
+        M = default_site.register(sig, public=True)(lambda r, s1, s2: s1+s2)
         self.assert_(validate_params(M, 'omg', u'wtf') is None)
 
         E = None
@@ -110,7 +110,7 @@ class JsonRpcFunctionalTestCase(unittest.TestCase):
 
     def test_validate_args_any(self):
         sig = 'jsonrpc(s1=Any, s2=Any)'
-        M = default_site.register(sig)(lambda r, s1, s2: s1+s2)
+        M = default_site.register(sig, public=True)(lambda r, s1, s2: s1+s2)
         self.assert_(validate_params(M, *['omg', 'wtf']) is None)
         self.assert_(validate_params(M, *[['omg'], ['wtf']]) is None)
         self.assert_(validate_params(M, **{'s1': 'omg', 's2': 'wtf'}) is None)
