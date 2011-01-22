@@ -375,7 +375,8 @@ class JsonRpcSite(object):
             'idempotent': M.allow_get,
             'params': [{'type': str(Any.kind(t)), 'name': k}
                 for k, t in M.signature_data["arguments"].iteritems()],
-            'return': {'type': str(M.signature_data["return_type"])}}
+            'return': {'type': str(M.signature_data["return_type"])},
+        }
 
     def service_desc(self):
         return {
@@ -384,9 +385,8 @@ class JsonRpcSite(object):
             'id': 'urn:uuid:%s' % str(self.uuid),
             'summary': self.__doc__,
             'version': self.version,
-            'procs': [self.procedure_desc(k)
-                for k in self._urls.iterkeys()
-                    if self._urls[k] != self.describe]}
+            'procs': map(self.procedure_desc, self._urls.iterkeys()),
+        }
 
     def describe(self, request):
         """Summarize service and the methods provided."""
