@@ -224,11 +224,12 @@ class JsonRpcSite(object):
 
     def register(self, name, authenticated=False, idempotent=False):
         def decorator(method):
-            if authenticated:
-                rpc_method = AuthenticatedRpcMethod(method, name, idempotent=idempotent)
-            else:
-                rpc_method = RpcMethod(method, name, idempotent=idempotent)
-            self._urls[unicode(rpc_method.signature_data["method_name"])] = rpc_method
+            rpc_method = {
+                True: AuthenticatedRpcMethod,
+                False: RpcMethod,
+            }[authenticated](method, name, idempotent=idempotent)
+            method_name = unicode(rpc_method.signature_data["method_name"])
+            self._urls[method_name] = rpc_method
             return rpc_method
         return decorator
 
