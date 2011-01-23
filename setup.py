@@ -25,25 +25,25 @@ Features:
 ::
 
     ## myproj/myapp/views.py
-    
+
     from jsonrpc import jsonrpc_method
-    
+
     @jsonrpc_method('myapp.sayHello')
     def whats_the_time(request, name='Lester'):
       return "Hello %s" % name
-    
+
     @jsonrpc_method('myapp.gimmeThat', authenticated=True)
     def something_special(request, secret_data):
       return {'sauce': ['authenticated', 'sauce']}
-    
-    
+
+
     ## myproj/urls.py
-    
+
     from django.conf.urls.defaults import *
     from jsonrpc import jsonrpc_site
     import myproj.myapp.views # you must import the views that need connected
-    
-    urlpatterns = patterns('', 
+
+    urlpatterns = patterns('',
       url(r'^json/browse/', 'jsonrpc.views.browse', name="jsonrpc_browser"), # for the graphical browser/web console only, omissible
       url(r'^json/', jsonrpc_site.dispatch, name="jsonrpc_mountpoint"),
       (r'^json/(?P<method>[a-zA-Z0-9.]+)$', jsonrpc_site.dispatch) # for HTTP GET only, also omissible
@@ -114,7 +114,7 @@ Adding JSON-RPC to your application
     from jsonrpc import jsonrpc_site
     import app.views
 
-    urlpatterns = patterns('', 
+    urlpatterns = patterns('',
       url(r'^json/$', jsonrpc_site.dispatch, name='jsonrpc_mountpoint'),
       # ... among your other URLs
     )
@@ -122,8 +122,8 @@ Adding JSON-RPC to your application
 
 The jsonrpc_method decorator
 ----------------------------
-Wraps a function turns it into a json-rpc method. Adds several attributes to 
-the function speific to the JSON-RPC machinery and adds it to the default 
+Wraps a function turns it into a json-rpc method. Adds several attributes to
+the function speific to the JSON-RPC machinery and adds it to the default
 jsonrpc_site if one isn't provided. You must import the module containing these
 functions in your urls.py.
 
@@ -132,17 +132,17 @@ functions in your urls.py.
 Arguments::
 
     name
-      
+
         The name of your method. IE: `namespace.methodName` The method name
         can include type information, like `ns.method(String, Array) -> Nil`.
 
-    authenticated=False   
+    authenticated=False
 
-        Adds `username` and `password` arguments to the beginning of your 
-        method if the user hasn't already been authenticated. These will 
-        be used to authenticate the user against `django.contrib.authenticate` 
-        If you use HTTP auth or other authentication middleware, `username` 
-        and `password` will not be added, and this method will only check 
+        Adds `username` and `password` arguments to the beginning of your
+        method if the user hasn't already been authenticated. These will
+        be used to authenticate the user against `django.contrib.authenticate`
+        If you use HTTP auth or other authentication middleware, `username`
+        and `password` will not be added, and this method will only check
         against `request.user.is_authenticated`.
 
         You may pass a callablle to replace `django.contrib.auth.authenticate`
@@ -151,13 +151,13 @@ Arguments::
 
     safe=False
 
-        Designates whether or not your method may be accessed by HTTP GET. 
+        Designates whether or not your method may be accessed by HTTP GET.
         By default this is turned off.
-  
+
     validate=False
 
-        Validates the arguments passed to your method based on type 
-        information provided in the signature. Supply type information by 
+        Validates the arguments passed to your method based on type
+        information provided in the signature. Supply type information by
         including types in your method declaration. Like so:
 
         @jsonrpc_method('myapp.specialSauce(Array, String)', validate=True)
@@ -165,23 +165,23 @@ Arguments::
           return SpecialSauce(ingredients, instructions)
 
         Calls to `myapp.specialSauce` will now check each arguments type
-        before calling `special_sauce`, throwing an `InvalidParamsError` 
+        before calling `special_sauce`, throwing an `InvalidParamsError`
         when it encounters a discrepancy. This can significantly reduce the
         amount of code required to write JSON-RPC services.
-  
+
     site=default_site
-      
-        Defines which site the jsonrpc method will be added to. Can be any 
+
+        Defines which site the jsonrpc method will be added to. Can be any
         object that provides a `register(name, func)` method.
 
 
 Using type checking on methods (Python 2.6 or greater)
 ------------------------------------------------------
 
-When writing web services you often end up manually checking the 
-types of parameters passed. django-json-rpc provides a way to eliminate 
-much of that code by specifying the types in your method signature. As 
-specified in the JSON-RPC spec the available types are ``Object Array Number 
+When writing web services you often end up manually checking the
+types of parameters passed. django-json-rpc provides a way to eliminate
+much of that code by specifying the types in your method signature. As
+specified in the JSON-RPC spec the available types are ``Object Array Number
 Boolean String Nil`` and ``Any`` meaning any type::
 
       @jsonrpc_method('app.addStrings(arg1=String, arg2=String) -> String', validate=True)
@@ -231,11 +231,11 @@ the json dispatch one. Make sure to include the name attribute of each url::
 Enabling HTTP-GET
 -----------------
 
-JSON-RPC 1.1 includes support for methods which are accessible by HTTP GET 
-which it calls idempotent. Add the following to your ``urls.py`` file to set 
+JSON-RPC 1.1 includes support for methods which are accessible by HTTP GET
+which it calls idempotent. Add the following to your ``urls.py`` file to set
 up the GET URL::
 
-    urlpatterns += patterns('', 
+    urlpatterns += patterns('',
       (r'^json/(?P<method>[a-zA-Z0-9.-_]+)$', jsonrpc_site.dispatch),
     )
 
@@ -251,11 +251,11 @@ You can then call the method by loading ``/jsonrpc/app.trimTails?arg1=omgnowai``
 Using authentication on methods
 -------------------------------
 
-There is no specific support for authentication in the JSON-RPC spec beyond 
-whatever authentication the transport offers. To restrict access to methods 
-to registered users provide ``authenticated=True`` to the method decorator. Doing 
-so will add two arguments to the beginning of your method signature, ``username`` 
-and ``password`` (and always in that order). By default, the credentials are 
+There is no specific support for authentication in the JSON-RPC spec beyond
+whatever authentication the transport offers. To restrict access to methods
+to registered users provide ``authenticated=True`` to the method decorator. Doing
+so will add two arguments to the beginning of your method signature, ``username``
+and ``password`` (and always in that order). By default, the credentials are
 authenticated against the builtin ``User`` database but any method can be used::
 
     @jsonrpc_method('app.thupertheecrit', authenticated=True)
@@ -276,9 +276,9 @@ Using your own authentication method::
       request.user.save()
       return request.user.__dict__
 
-In case authentication is handled before your method is called, like in some 
-middleware, providing ``authenticated=True`` to the method decorator will only 
-check that ``request.user`` is authenticated and won't add any parameters to 
+In case authentication is handled before your method is called, like in some
+middleware, providing ``authenticated=True`` to the method decorator will only
+check that ``request.user`` is authenticated and won't add any parameters to
 the beginning of your method.
 
 """,
@@ -298,4 +298,6 @@ the beginning of your method.
   packages=['jsonrpc'],
   zip_safe = False, # we include templates and tests
   install_requires=['Django>=1.0'],
-  package_data={'jsonrpc': ['templates/*']})
+  package_data={'jsonrpc': ['templates/*.html',
+                            'templates/jsonrpc/*.html',
+                            'templates/jsonrpc/documentation/*.html']})
