@@ -64,11 +64,17 @@ def _eval_arg_type(arg_type, T=Any, arg=None, sig=None):
 
 
 class RpcMethod(object):
-    def __init__(self, func, signature="", idempotent=False):
+    def __init__(self,
+                 func,
+                 signature="",
+                 public=False,
+                 idempotent=False,
+                 **kwargs):
         self.func = func
         self.__doc__ = func.__doc__
         self.__signature_data = self.parse_signature(func, signature)
         self.__name__ = self.__signature_data["method_name"]
+        self.public = public
         self.idempotent = idempotent
 
     @classmethod
@@ -132,10 +138,15 @@ class RpcMethod(object):
 class AuthenticatedRpcMethod(RpcMethod):
     def __init__(self, *args, **kwargs):
         super(AuthenticatedRpcMethod, self).__init__(*args, **kwargs)
-        self.prepend_argument("password", String)
-        self.prepend_argument("username", String)
+        if not self.public:
+            self.prepend_argument("password", String)
+            self.prepend_argument("username", String)
 
     def __call__(self, request, *args, **kwargs):
+        if self.public:
+            return super(AuthenticatedRpcMethod, self).__call__(request,
+                                                                *args,
+                                                                **kwargs)
         user = None
         try:
             username, password = args[:2]
@@ -222,12 +233,14 @@ class JsonRpcSite(object):
         self.describe = self.register("system.describe", public=True)(self.describe)
         self.json_encoder = json_encoder
 
-    def register(self, name, public=False, idempotent=False):
+    def register(self, name, public=False, idempotent=False, **kwargs):
         def decorator(method):
-            rpc_method = {
-                True: RpcMethod,
-                False: AuthenticatedRpcMethod,
-            }[public](method, name, idempotent=idempotent)
+            rpc_method_class = kwargs.pop("rpc_class", AuthenticatedRpcMethod)
+            rpc_method = rpc_method_class(method,
+                                          name,
+                                          public=public,
+                                          idempotent=idempotent,
+                                          **kwargs)
             method_name = unicode(rpc_method.signature_data["method_name"])
             self._urls[method_name] = rpc_method
             return rpc_method
