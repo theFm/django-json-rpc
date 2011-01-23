@@ -440,9 +440,12 @@ def setup_default_site():
         except ImportError:
             raise ImproperlyConfigured("Can't import site `%s` from " \
                                        "`%s`" % (class_name, module_name))
-    if not isinstance(site_class, type):
-        raise ImproperlyConfigured("JSONRPC_DEFAULT_SITE must be a class " \
-                                   "instance or an import path string " \
-                                   "pointing to a class.")
+    elif callable(site_class):
+        site_class = site_class()
+    else:
+        raise ImproperlyConfigured("JSONRPC_DEFAULT_SITE must be a callable " \
+                                   "that returns a JSON-RPC site instance " \
+                                   "or an import path string pointing to a " \
+                                   "class.")
     default_site = site_class("jsonrpc")
 setup_default_site()
