@@ -1,21 +1,16 @@
 from uuid import uuid1
 import re
 from inspect import getargspec
-from django.core.exceptions import ImproperlyConfigured
 from django.core import signals
 from django.http import HttpResponse
 from django.shortcuts import render_to_response
 from django.template.context import RequestContext
 from django.utils.datastructures import SortedDict
-from django.utils.importlib import import_module
 from django.contrib.auth import authenticate
 from jsonrpc._json import loads, dumps
 from jsonrpc.exceptions import *
 from jsonrpc.types import *
 import app_settings
-
-
-default_site = None
 
 
 empty_dec = lambda f: f
@@ -425,27 +420,3 @@ class JsonRpcSite(object):
         response["Access-Control-Allow-Headers"] = request.META.get(
                                      "HTTP_ACCESS_CONTROL_REQUEST_HEADERS", "")
         return response
-
-
-def setup_default_site():
-    global default_site
-    site_class = app_settings.DEFAULT_SITE
-    if site_class is None:
-        default_site = JsonRpcSite("jsonrpc")
-        return
-    if isinstance(site_class, (str, unicode)):
-        module_name, class_name = site_class.rsplit('.', 1)
-        try:
-            site_class = getattr(import_module(module_name), class_name)
-        except ImportError:
-            raise ImproperlyConfigured("Can't import site `%s` from " \
-                                       "`%s`" % (class_name, module_name))
-    elif callable(site_class):
-        site_class = site_class()
-    else:
-        raise ImproperlyConfigured("JSONRPC_DEFAULT_SITE must be a callable " \
-                                   "that returns a JSON-RPC site instance " \
-                                   "or an import path string pointing to a " \
-                                   "class.")
-    default_site = site_class("jsonrpc")
-setup_default_site()
