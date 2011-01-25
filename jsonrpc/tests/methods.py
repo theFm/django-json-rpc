@@ -1,4 +1,4 @@
-from jsonrpc.site import default_site
+from jsonrpc.conf import default_site
 
 
 @default_site.register("jsonrpc.test", public=True)

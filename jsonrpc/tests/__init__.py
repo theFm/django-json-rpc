@@ -4,9 +4,10 @@ from django.test import TestCase
 from django.utils import simplejson as json
 from django.contrib.auth.models import User
 from django.utils.datastructures import SortedDict
+from jsonrpc.conf import default_site
 from jsonrpc.exceptions import InvalidParamsError, InvalidCredentialsError
 from jsonrpc.proxy import TestServiceProxy, JsonRpcTestClient
-from jsonrpc.site import validate_params, default_site, RpcMethod
+from jsonrpc.site import validate_params, RpcMethod
 from jsonrpc.types import String, Object, Array, Nil, Number, Any
 
 
@@ -98,7 +99,8 @@ class RpcMethodClassTestCase(unittest.TestCase):
 class JsonRpcFunctionalTestCase(unittest.TestCase):
     def test_validate_args(self):
         sig = 'jsonrpc(String, String) -> String'
-        M = default_site.register(sig, public=True)(lambda r, s1, s2: s1+s2)
+        default_site.register(sig, public=True)(lambda r, s1, s2: s1+s2)
+        M = default_site._urls["jsonrpc"]
         self.assert_(validate_params(M, 'omg', u'wtf') is None)
 
         E = None
@@ -110,7 +112,8 @@ class JsonRpcFunctionalTestCase(unittest.TestCase):
 
     def test_validate_args_any(self):
         sig = 'jsonrpc(s1=Any, s2=Any)'
-        M = default_site.register(sig, public=True)(lambda r, s1, s2: s1+s2)
+        default_site.register(sig, public=True)(lambda r, s1, s2: s1+s2)
+        M = default_site._urls["jsonrpc"]
         self.assert_(validate_params(M, *['omg', 'wtf']) is None)
         self.assert_(validate_params(M, *[['omg'], ['wtf']]) is None)
         self.assert_(validate_params(M, **{'s1': 'omg', 's2': 'wtf'}) is None)

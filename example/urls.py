@@ -1,6 +1,6 @@
 from django.conf.urls.defaults import *
 from django.conf import settings
-from jsonrpc.site import default_site
+from jsonrpc.conf import default_site
 
 
 import jsonrpc.tests.methods

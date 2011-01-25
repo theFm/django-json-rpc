@@ -64,6 +64,7 @@ class RpcMethod(object):
                  signature="",
                  public=False,
                  idempotent=False,
+                 decorators=None,
                  **kwargs):
         self.func = func
         self.__doc__ = func.__doc__
@@ -71,6 +72,7 @@ class RpcMethod(object):
         self.__name__ = self.__signature_data["method_name"]
         self.public = public
         self.idempotent = idempotent
+        self.decorators = decorators or []
 
     @classmethod
     def parse_signature(cls, func, signature):
@@ -127,7 +129,10 @@ class RpcMethod(object):
         self.__signature_data["arguments"].insert(0, argument_name, argument_type)
 
     def __call__(self, request, *args, **kwargs):
-        return self.func(request, *args, **kwargs)
+        decorated = self.func
+        for decorator in self.decorators:
+            decorated = decorator(decorated)
+        return decorated(request, *args, **kwargs)
 
 
 class AuthenticatedRpcMethod(RpcMethod):
@@ -228,17 +233,24 @@ class JsonRpcSite(object):
         self.describe = self.register("system.describe", public=True)(self.describe)
         self.json_encoder = json_encoder
 
-    def register(self, name, public=False, idempotent=False, **kwargs):
+    def register(self,
+                 name,
+                 public=False,
+                 idempotent=False,
+                 decorators=None,
+                 **kwargs):
+        decorators = decorators or []
         def decorator(method):
             rpc_method_class = kwargs.pop("rpc_class", AuthenticatedRpcMethod)
             rpc_method = rpc_method_class(method,
                                           name,
                                           public=public,
                                           idempotent=idempotent,
+                                          decorators=decorators,
                                           **kwargs)
             method_name = unicode(rpc_method.signature_data["method_name"])
             self._urls[method_name] = rpc_method
-            return rpc_method
+            return method
         return decorator
 
     def empty_response(self, version='1.0'):
